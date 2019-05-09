@@ -1,6 +1,3 @@
-# parseSerializedString
-Small function to parse URL query params and output an object. Can also be used to revert the result of jQuery.serialize();
-
 # Examples
 ```javascript
 //"testArray[][][][][][]=1&testArray[][][][][][]=2&testArray[][][][][][]=3&testArray[][][][][][]=4"
