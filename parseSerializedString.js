@@ -1,81 +1,123 @@
+/**
+ * Takes a string in format "param1=value1&param2=value2" and returns an object { param1: 'value1', param2: 'value2' }
+ *
+ * Example:
+ *
+ * Input:  param1=value1&param2=value2
+ * Return: { param1 : value1, param2: value2 }
+ *
+ * Input:  param1[]=value1&param1[]=value2
+ * Return: { param1: {0: value1, 1: value2 } }
+ *
+ * Usage example: console.log(parseSerializedString("one="+escape("& = ?")+"&two="+escape("value1")+"&two="+escape("value2")+"&three[]="+escape("value1")+"&three[]="+escape("value2")));
+ */
 function parseSerializedString(serializedString)
+{
+    if((serializedString || '') === '')
     {
-        if(serializedString === '')
+        return {};
+    }
+
+    const keyValuePairs = serializedString.indexOf('&') !== -1 ? decodeURI(serializedString.trim()).split('&') : [decodeURI(serializedString.trim())],
+          arrayTokenRegexp = /\[([^\[\]]*?)\]/g,
+          pairsLength = keyValuePairs.length;
+
+    let currentKeyValue,
+        currentPairKey,
+        currentPairValue,
+        splitIndex,
+        parsedObj = {},
+        currentPairIndex = 0,
+        currentDepth,
+        arrayName,
+        arrayStructure,
+        currentArrayIndex,
+        depthArray,
+        arrayStartIndex;
+
+    for (; currentPairIndex < pairsLength; ++currentPairIndex)
+    {
+        currentKeyValue = unescape(keyValuePairs[currentPairIndex]);
+        if(currentKeyValue === '')
         {
-            return {};
+            continue;
         }
 
-        let keyValuePairs = decodeURI(serializedString).split('&'),
-            currentKeyValue,
-            currentPairKey,
-            currentPairValue,
-            splitIndex,
-            parsedObj = {},
-            currentPairIndex = 0,
-            pairsLength = keyValuePairs.length,
-            arrayTokenRegexp = /\[([^\[\]]*?)\]/g,
-            currentDepth,
-            arrayName,
-            arrayStructure,
-            currentArrayIndex,
-            depthArray,
-            arrayStartIndex,
-            autoIncrements;
+        splitIndex = currentKeyValue.indexOf('=');
 
-        for (; currentPairIndex < pairsLength; ++currentPairIndex)
+        currentPairKey = currentKeyValue.substring(0, splitIndex);
+        currentPairValue = currentKeyValue.substring(splitIndex + 1);
+
+        arrayStartIndex = currentPairKey.indexOf('[');
+
+        if(arrayStartIndex !== -1)
         {
-            currentKeyValue = keyValuePairs[currentPairIndex];
+            arrayName = currentPairKey.substring(0, arrayStartIndex);
+            arrayStructure = currentPairKey.substring(arrayStartIndex);
+            depthArray = [];
 
-            splitIndex = currentKeyValue.indexOf('=');
-
-            currentPairKey = currentKeyValue.substring(0, splitIndex);
-            currentPairValue = currentKeyValue.substring(splitIndex + 1);
-
-            arrayStartIndex = currentPairKey.indexOf('[');
-
-            if(arrayStartIndex !== -1)
+            while((currentArrayIndex = arrayTokenRegexp.exec(arrayStructure)) !== null)
             {
-                arrayName = currentPairKey.substring(0, arrayStartIndex);
-                arrayStructure = currentPairKey.substring(arrayStartIndex);
-                depthArray = [];
-                autoIncrements = -1;
-
-                if(!parsedObj[arrayName])
+                currentArrayIndex = currentArrayIndex[1].trim();
+                if(typeof parsedObj[arrayName] === "undefined")
                 {
-                    parsedObj[arrayName] = {};
-                }
-
-                while((currentArrayIndex = arrayTokenRegexp.exec(arrayStructure)) !== null)
-                {
-                    currentArrayIndex = currentArrayIndex[1];
-                    if (currentArrayIndex === '')
+                    if(currentArrayIndex === '')
                     {
-                        currentArrayIndex = ++autoIncrements;
-                    }
-                    depthArray.push(currentArrayIndex);
-                }
-
-                currentDepth = parsedObj[arrayName];
-                depthArray.forEach((value, index) =>
-                {
-                    if((index + 1) === depthArray.length)
-                    {
-                        currentDepth[value] = currentPairValue;
+                        parsedObj[arrayName] = [];
                     }
                     else
                     {
-                        if(!currentDepth[value])
-                        {
-                            currentDepth[value] = {};
-                        }
-                        currentDepth = currentDepth[value];
+                        parsedObj[arrayName] = {};
                     }
-                });
+                }
+                depthArray.push(currentArrayIndex);
             }
-            else
+
+            currentDepth = parsedObj[arrayName];
+            depthArray.forEach((currentDepthIndex, currentElementIndex) =>
             {
-                parsedObj[currentPairKey] = currentPairValue;
-            }
+                if(currentDepthIndex === '')
+                {
+                    currentDepthIndex = 0;
+                }
+
+                const nextDepthIndex = currentElementIndex + 1;
+                if(nextDepthIndex < depthArray.length)
+                {
+                    if(typeof currentDepth[currentDepthIndex] === "undefined")
+                    {
+                        if (depthArray[nextDepthIndex] === '')
+                        {
+                            currentDepth[currentDepthIndex] = [];
+                        }
+                        else
+                        {
+                            currentDepth[currentDepthIndex] = {};
+                        }
+                    }
+                    else if(Array.isArray(currentDepth))
+                    {
+                        currentDepthIndex = currentDepth.push([]) - 1;
+                    }
+                    currentDepth = currentDepth[currentDepthIndex];
+                }
+                else // NOTE: Last element
+                {
+                    if(Array.isArray(currentDepth))
+                    {
+                        currentDepth.push(currentPairValue);
+                    }
+                    else
+                    {
+                        currentDepth[currentDepthIndex] = currentPairValue;
+                    }
+                }
+            });
         }
-        return parsedObj;
+        else
+        {
+            parsedObj[currentPairKey] = currentPairValue;
+        }
     }
+    return parsedObj;
+}
